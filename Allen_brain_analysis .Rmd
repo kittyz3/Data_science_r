@@ -1,0 +1,64 @@
+---
+title: "Allen brain data analysis"
+author: "Ruiyu Zeng"
+date: "5/17/2019"
+output:
+  html_document: default
+  pdf_document: default
+updated on: 9/3/2019
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Title: How to do principal component regression using datasets from the Allen brain institute  
+
+    I personally think it's interestng to use machine learning and data science tools to analyse biomedically relevant datasets, largely because of my background in Biology. The Allen brain institute has conducted a longitudinal study about the effects of traumatic brain injury (TBI), age, genetics on the onset of dementia. You can read more about this study here: http://aging.brain-map.org/. 
+    Overall, the two datasets I am going to use contain biological markers (i.e. genes and their protein products) and clinical diagnoses (i.e. diagnoses of dementia). Specifically, I would like to visualize the datasets and conduct a principal component analysis to see what factors account for the most variation in dementia. 
+```{r}
+   # import necessary libraries 
+   library(tidyr)
+   library(dplyr)
+   library(ggplot2)
+   library(pls)
+   library(ggcorrplot)
+   
+  #import data 
+   allen_brain <- read.csv("ProteinAndPathologyQuantifications.csv")
+   str(allen_brain) # dataset consists of 377 observations of 33 variables
+   clinical_diagnosis <- read.csv("query_clinical.csv")
+   str(clinical_diagnosis) # 107 observations of 19 variables
+   
+  
+```
+From the couple of lines of code above, we can know that the columns of the first dataset (allen_brain) consist of information about certain protein deposits (ex. tau_a_pg_per_mg) and about expression levels of genes associated with increasing risk of dementia. In the second dataset, there's demographic information along with dementia diagnosis of the donors. I think to get a full picture of the study overall, I need to combine the two datasets together. 
+
+```{r}
+   # Combine the two datasets, matched by donor ID
+   behav_brain <- full_join(allen_brain,clinical_diagnosis,by="donor_id")
+   str(behav_brain) 
+   # visualize some data about the proportions of dementia diagnosis
+   pie(table(behav_brain$dsm_iv_clinical_diagnosis))
+   pie(table(behav_brain$nincds_arda_diagnosis))
+   pie(table(behav_brain$race))
+   # See how many factors are correlated with each other using a correlation matrix
+   num_behave_brain <- select_if(behav_brain,is.numeric) # select only numeric values of the joint dataset
+   num_behave_brain <- na.omit(num_behave_brain) # ignore NA's in dataset
+   #corr_brain <- corrgram(num_behave_brain,order=TRUE,lower.panel = panel.shade,upper.panel = panel.pie, text.panel = panel.txt, main="correlation of variables in terms of principal components")
+   corr_num <- cor(num_behave_brain[,-c(1,2)],method = "pearson",use="complete.obs") 
+   par(mgp=c(3,10,3),mar= c(10,7,7,8)+0.1) # mar is c(bottom, left, top, right)
+   corr_mat <- ggcorrplot(corr_num, sig.level = 0.05, lab_size = 4) + theme(axis.text.x = element_text(size=15, margin=margin(-4,4,-4,4)), axis.text.y = element_text(size=15, margin=margin(0,-2,0,0)))
+   corr_mat # the texts for axis labels are smashed together; however, the red squares indicate positive correlations, and the blue labels indicate negative correlations
+```  
+  Now we have joined the datasets that contain the relevant protein expressions and clinical measurements. Based on the pie charts that reveal information about different dementia diagnosis, we can tell that about a third of the subjects included have Alzheimer's disease. Additionally, the correlation matrix also tells us that different types of gene expression have different correlations with each other. 
+  Due to the large number of genes in our combined dataset, it will be difficult to pinpoint what specific genes predict onset of dementia. Therefore, analyzing the dataset using PCA (principal component analysis) may be the best at telling us what combination of genes is best at predicting variation in dementia. 
+```{r}
+  # conduct a PCA, which is when we will use pls package
+ set.seed(1)
+ pca.brain <- prcomp(na.omit(num_behave_brain[,-c(1,2)]), center=TRUE)
+ summary(pca.brain) 
+ plot(pca.brain, type = "l")
+ pca.brain$rotation
+ biplot(pca.brain,scale=0) # reveal the loadings of each principal component 
+ ```  
+ 
